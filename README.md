@@ -1,16 +1,33 @@
-# PDF Editor (Python)
+# PDF Editor (Python / PySide6)
 
-A simple PDF editor with GUI built using CustomTkinter.
+A modern cross-platform PDF editor built with Python and PySide6.  
+Supports loading, merging, reordering, deleting, and saving PDFs with a clean GUI.
 
-## Features
-- Load PDF
-- Preview pages
-- Reorder pages
+---
+
+## 🚀 Features
+
+- Load PDF files
+- Preview pages as thumbnails
+- Reorder pages (up/down)
 - Delete pages
 - Merge multiple PDFs
 - Save edited PDF
+- Smooth scrolling (macOS compatible UI)
 
-## Installation
+---
+
+## 🛠 Tech Stack
+
+- Python 3
+- PySide6 (Qt GUI)
+- PyMuPDF (PDF rendering)
+- PyPDF2 (PDF editing)
+- Pillow (image handling)
+
+---
+
+## 📦 Installation
 
 ```bash
 pip install -r requirements.txt

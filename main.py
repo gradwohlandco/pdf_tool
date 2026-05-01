@@ -1,73 +1,94 @@
+import sys
+import fitz
 import PyPDF2
-import fitz  # PyMuPDF
-import customtkinter as ctk
-from tkinter import filedialog, Scrollbar, Canvas, Frame
-from PIL import Image
-from customtkinter import CTkImage
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QPushButton, QFileDialog, QLabel, QScrollArea,
+    QFrame, QHBoxLayout
+)
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt
 
 
-class PDFEditor(ctk.CTk):
+class PDFEditor(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.title("PDF Editor")
-        self.geometry("1000x600")
+        self.setWindowTitle("PDF Editor Pro")
+        self.setGeometry(200, 100, 1100, 750)
 
-        # IMPORTANT: echte Python-Liste (fix für dein Error)
         self.pages = []
         self.previews = []
-        self.pdf_path = None
 
-        # ---------------- UI ----------------
-        self.load_pdf_button = ctk.CTkButton(
-            self, text="Load PDF", command=self.load_pdf
-        )
-        self.load_pdf_button.pack(pady=10)
+        # ---------------- ROOT UI ----------------
+        central = QWidget()
+        self.setCentralWidget(central)
 
-        self.button_frame = ctk.CTkFrame(self)
-        self.button_frame.pack(pady=10)
+        layout = QVBoxLayout(central)
 
-        ctk.CTkButton(
-            self.button_frame, text="Merge PDFs", command=self.merge_pdfs
-        ).pack(side="left", padx=10)
+        self.load_btn = QPushButton("📂 Load PDF")
+        self.load_btn.clicked.connect(self.load_pdf)
 
-        ctk.CTkButton(
-            self.button_frame, text="Save PDF", command=self.save_pdf
-        ).pack(side="left", padx=10)
+        self.merge_btn = QPushButton("➕ Merge PDFs")
+        self.merge_btn.clicked.connect(self.merge_pdfs)
+
+        self.save_btn = QPushButton("💾 Save PDF")
+        self.save_btn.clicked.connect(self.save_pdf)
+
+        layout.addWidget(self.load_btn)
+        layout.addWidget(self.merge_btn)
+        layout.addWidget(self.save_btn)
 
         # ---------------- SCROLL AREA ----------------
-        self.frame = Frame(self)
-        self.frame.pack(fill="both", expand=True)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
 
-        self.canvas = Canvas(self.frame)
-        self.scrollbar = Scrollbar(self.frame, orient="vertical", command=self.canvas.yview)
+        self.container = QWidget()
+        self.scroll_layout = QVBoxLayout(self.container)
 
-        self.scrollable_frame = Frame(self.canvas)
+        self.scroll.setWidget(self.container)
+        layout.addWidget(self.scroll)
 
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-    # ---------------- LOAD PDF ----------------
+    # ---------------- LOAD ----------------
     def load_pdf(self):
-        self.pdf_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
-        if not self.pdf_path:
+        path, _ = QFileDialog.getOpenFileName(self, "Open PDF", "", "PDF Files (*.pdf)")
+        if not path:
             return
 
-        reader = PyPDF2.PdfReader(self.pdf_path)
+        self.pages = list(PyPDF2.PdfReader(path).pages)
+        self.previews = self.render_previews(path, len(self.pages))
 
-        # FIX: echte Liste
-        self.pages = list(reader.pages)
+        self.refresh()
 
-        self.previews = self.render_previews(self.pdf_path, len(self.pages))
-        self.display_pages()
+    # ---------------- MERGE ----------------
+    def merge_pdfs(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, "Merge PDFs", "", "PDF Files (*.pdf)")
+        if not paths:
+            return
+
+        for path in paths:
+            reader = PyPDF2.PdfReader(path)
+            pages = list(reader.pages)
+
+            self.pages.extend(pages)
+            self.previews.extend(self.render_previews(path, len(pages)))
+
+        self.refresh()
+
+    # ---------------- SAVE ----------------
+    def save_pdf(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save PDF", "", "PDF Files (*.pdf)")
+        if not path:
+            return
+
+        writer = PyPDF2.PdfWriter()
+
+        for page in self.pages:
+            writer.add_page(page)
+
+        with open(path, "wb") as f:
+            writer.write(f)
 
     # ---------------- PREVIEWS ----------------
     def render_previews(self, path, count):
@@ -78,56 +99,71 @@ class PDFEditor(ctk.CTk):
             page = doc.load_page(i)
             pix = page.get_pixmap()
 
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            img.thumbnail((100, 100))
-
-            previews.append(
-                CTkImage(light_image=img, dark_image=img, size=(100, 100))
+            img = QImage(
+                pix.samples,
+                pix.width,
+                pix.height,
+                pix.stride,
+                QImage.Format_RGB888
             )
+
+            pixmap = QPixmap.fromImage(img).scaledToWidth(180, Qt.SmoothTransformation)
+            previews.append(pixmap)
 
         doc.close()
         return previews
 
-    # ---------------- DISPLAY ----------------
-    def display_pages(self):
-        for widget in self.scrollable_frame.winfo_children():
-            widget.destroy()
+    # ---------------- UI ----------------
+    def refresh(self):
+        # clear UI
+        for i in reversed(range(self.scroll_layout.count())):
+            widget = self.scroll_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
 
+        # rebuild pages
         for i in range(len(self.pages)):
-            self.display_page(i)
+            self.add_page(i)
 
-    def display_page(self, i):
-        ctk.CTkLabel(
-            self.scrollable_frame,
-            image=self.previews[i],
-            text=""
-        ).grid(row=i, column=0, padx=10, pady=5)
+    def add_page(self, i):
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background-color: #2b2b2b;
+                border-radius: 12px;
+                padding: 10px;
+                margin: 5px;
+            }
+        """)
 
-        ctk.CTkLabel(
-            self.scrollable_frame,
-            text=f"Page {i + 1}"
-        ).grid(row=i, column=1)
+        layout = QHBoxLayout(card)
 
-        ctk.CTkButton(
-            self.scrollable_frame,
-            text="↑",
-            command=lambda i=i: self.move_up(i)
-        ).grid(row=i, column=2)
+        # Preview
+        img = QLabel()
+        img.setPixmap(self.previews[i])
 
-        ctk.CTkButton(
-            self.scrollable_frame,
-            text="X",
-            fg_color="red",
-            command=lambda i=i: self.delete(i)
-        ).grid(row=i, column=3)
+        # Page label
+        label = QLabel(f"Page {i + 1}")
+        label.setStyleSheet("color: white; font-size: 14px;")
 
-        ctk.CTkButton(
-            self.scrollable_frame,
-            text="↓",
-            command=lambda i=i: self.move_down(i)
-        ).grid(row=i, column=4)
+        # Buttons
+        up_btn = QPushButton("⬆")
+        down_btn = QPushButton("⬇")
+        del_btn = QPushButton("🗑")
 
-    # ---------------- ACTIONS ----------------
+        up_btn.clicked.connect(lambda _, i=i: self.move_up(i))
+        down_btn.clicked.connect(lambda _, i=i: self.move_down(i))
+        del_btn.clicked.connect(lambda _, i=i: self.delete(i))
+
+        layout.addWidget(img)
+        layout.addWidget(label)
+        layout.addWidget(up_btn)
+        layout.addWidget(down_btn)
+        layout.addWidget(del_btn)
+
+        self.scroll_layout.addWidget(card)
+
+    # ---------------- EDIT FUNCTIONS ----------------
     def move_up(self, i):
         if i <= 0:
             return
@@ -141,44 +177,16 @@ class PDFEditor(ctk.CTk):
     def swap(self, i, j):
         self.pages[i], self.pages[j] = self.pages[j], self.pages[i]
         self.previews[i], self.previews[j] = self.previews[j], self.previews[i]
-        self.display_pages()
+        self.refresh()
 
     def delete(self, i):
         del self.pages[i]
         del self.previews[i]
-        self.display_pages()
-
-    # ---------------- SAVE ----------------
-    def save_pdf(self):
-        writer = PyPDF2.PdfWriter()
-
-        for page in self.pages:
-            writer.add_page(page)
-
-        path = filedialog.asksaveasfilename(defaultextension=".pdf")
-        if path:
-            with open(path, "wb") as f:
-                writer.write(f)
-
-    # ---------------- MERGE ----------------
-    def merge_pdfs(self):
-        paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
-        if not paths:
-            return
-
-        for path in paths:
-            reader = PyPDF2.PdfReader(path)
-
-            pages = list(reader.pages)
-            self.pages.extend(pages)
-
-            self.previews.extend(
-                self.render_previews(path, len(pages))
-            )
-
-        self.display_pages()
+        self.refresh()
 
 
 if __name__ == "__main__":
-    app = PDFEditor()
-    app.mainloop()
+    app = QApplication(sys.argv)
+    window = PDFEditor()
+    window.show()
+    sys.exit(app.exec())
