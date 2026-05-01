@@ -25,7 +25,7 @@ Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
 
 A modern, lightweight PDF editor built with **Python**, **PySide6**, and **PyMuPDF**. This application allows you to manage PDF documents intuitively—reordering, merging, or deleting pages—all wrapped in a sleek dark-mode interface that looks great on Windows 11, macOS, and Linux.
 
-![Application Preview](image_5962dd.png)
+![Application Preview](./assets/Preview_01.png)
 
 ## ✨ Features
 
@@ -42,7 +42,7 @@ Ensure you have Python 3.8 or higher installed.
 
 1.  **Clone the Repository:**
     ```bash
-    git clone [https://github.com/gradwohlandco/pdf-editor-pro.git](https://github.com/gradwohlandco/pdf-editor-pro.git)
+    git clone https://github.com/gradwohlandco/pdf-editor-pro.git
     cd pdf-editor-pro
     ```
 
